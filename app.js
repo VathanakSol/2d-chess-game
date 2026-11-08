@@ -4,8 +4,8 @@ const PIECES = {
 };
 
 let board, turn, selected, legalMoves, lastMove, gameOver;
-let gameMode = 'local'; // 'local' or 'online'
-let playerColor = null; // 'w' or 'b' for online games
+let gameMode = 'local';
+let playerColor = null;
 let roomCode = null;
 let roomRef = null;
 let isMyTurn = true;
@@ -52,10 +52,6 @@ function showMenu() {
   resetBtn.classList.add('hidden');
   leaveBtn.classList.add('hidden');
   statusEl.textContent = 'Select game mode';
-  if (roomRef) {
-    roomRef.off();
-    roomRef = null;
-  }
 }
 
 // Show game
@@ -64,11 +60,26 @@ function showGame() {
   joinFormEl.classList.add('hidden');
   boardEl.classList.remove('hidden');
   resetBtn.classList.remove('hidden');
+  if (gameMode === 'online') {
+    gameInfoEl.classList.remove('hidden');
+    leaveBtn.classList.remove('hidden');
+  }
 }
 
-// Local game button
+// Generate room code
+function generateRoomCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Play local button
 document.getElementById('local-btn').addEventListener('click', () => {
   gameMode = 'local';
+  playerColor = null;
   showGame();
   initGame();
 });
@@ -89,136 +100,94 @@ document.getElementById('create-btn').addEventListener('click', async () => {
     ['wP','wP','wP','wP','wP','wP','wP','wP'],
     ['wR','wN','wB','wQ','wK','wB','wN','wR']
   ];
-
-  roomRef = database.ref('rooms/' + roomCode);
-  await roomRef.set({
-    board: initialBoard,
-    turn: 'w',
-    lastMove: null,
-    gameOver: false,
-    whitePlayer: true,
-    blackPlayer: false,
-    createdAt: firebase.database.ServerValue.TIMESTAMP
-  });
-
-  showGame();
-  gameInfoEl.classList.remove('hidden');
-  leaveBtn.classList.remove('hidden');
-  roomDisplayEl.textContent = `Room: ${roomCode}`;
-  playerColorEl.textContent = 'You are: White';
   
-  initGame();
-  listenToRoom();
+  try {
+    roomRef = database.ref('rooms/' + roomCode);
+    await roomRef.set({
+      board: initialBoard,
+      turn: 'w',
+      lastMove: null,
+      gameOver: false,
+      whitePlayer: true,
+      blackPlayer: false,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    
+    roomDisplayEl.textContent = `Room Code: ${roomCode} (Share this with your opponent!)`;
+    playerColorEl.textContent = 'You are: White';
+    
+    listenToRoom();
+    showGame();
+    initGame();
+  } catch (error) {
+    console.error('Error creating game:', error);
+    alert('Failed to create game. Please check your internet connection and try again.');
+    showMenu();
+  }
 });
 
 // Join online game button (show form)
 document.getElementById('join-btn').addEventListener('click', () => {
   menuEl.classList.add('hidden');
   joinFormEl.classList.remove('hidden');
-  roomCodeInputEl.focus();
 });
 
-// Join form submit
+// Cancel join
+document.getElementById('join-cancel').addEventListener('click', () => {
+  showMenu();
+});
+
+// Submit join
 document.getElementById('join-submit').addEventListener('click', async () => {
   const code = roomCodeInputEl.value.trim().toUpperCase();
   if (!code) {
     alert('Please enter a room code');
     return;
   }
-
-  gameMode = 'online';
-  playerColor = 'b';
-  roomCode = code;
-  roomRef = database.ref('rooms/' + roomCode);
-
-  const snapshot = await roomRef.once('value');
-  const roomData = snapshot.val();
-
-  if (!roomData) {
-    alert('Room not found!');
-    return;
-  }
-
-  if (roomData.blackPlayer) {
-    alert('Room is full!');
-    return;
-  }
-
-  await roomRef.update({ blackPlayer: true });
-
-  showGame();
-  gameInfoEl.classList.remove('hidden');
-  leaveBtn.classList.remove('hidden');
-  roomDisplayEl.textContent = `Room: ${roomCode}`;
-  playerColorEl.textContent = 'You are: Black';
   
-  initGame();
-  listenToRoom();
-});
-
-// Join form cancel
-document.getElementById('join-cancel').addEventListener('click', () => {
-  joinFormEl.classList.add('hidden');
-  menuEl.classList.remove('hidden');
-  roomCodeInputEl.value = '';
-});
-
-// Reset button
-resetBtn.addEventListener('click', () => {
-  if (gameMode === 'local') {
+  try {
+    roomCode = code;
+    roomRef = database.ref('rooms/' + roomCode);
+    const snapshot = await roomRef.once('value');
+    
+    if (!snapshot.exists()) {
+      alert('Room not found. Please check the code and try again.');
+      return;
+    }
+    
+    const roomData = snapshot.val();
+    if (roomData.blackPlayer) {
+      alert('This game is already full.');
+      return;
+    }
+    
+    gameMode = 'online';
+    playerColor = 'b';
+    
+    await roomRef.update({ blackPlayer: true });
+    
+    roomDisplayEl.textContent = `Room Code: ${roomCode}`;
+    playerColorEl.textContent = 'You are: Black';
+    
+    listenToRoom();
+    showGame();
     initGame();
-  } else {
-    // For online games, reset the room
-    if (roomRef) {
-      const initialBoard = [
-        ['bR','bN','bB','bQ','bK','bB','bN','bR'],
-        ['bP','bP','bP','bP','bP','bP','bP','bP'],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        ['wP','wP','wP','wP','wP','wP','wP','wP'],
-        ['wR','wN','wB','wQ','wK','wB','wN','wR']
-      ];
-      roomRef.update({
-        board: initialBoard,
-        turn: 'w',
-        lastMove: null,
-        gameOver: false
-      });
-    }
+  } catch (error) {
+    console.error('Error joining game:', error);
+    alert('Failed to join game. Please check your internet connection and try again.');
   }
-});
-
-// Leave button
-leaveBtn.addEventListener('click', () => {
-  if (roomRef) {
-    roomRef.off();
-    // Optionally delete the room if you're the creator
-    if (playerColor === 'w') {
-      roomRef.remove();
-    }
-  }
-  showMenu();
 });
 
 // Listen to room changes
 function listenToRoom() {
   roomRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    if (!data) {
-      // Room was deleted
-      if (gameMode === 'online') {
-        alert('The game room has been closed.');
-        showMenu();
-      }
-      return;
-    }
-
+    if (!data) return;
+    
     board = data.board;
     turn = data.turn;
     lastMove = data.lastMove;
-    gameOver = data.gameOver || false;
+    gameOver = data.gameOver;
     
     isMyTurn = (turn === playerColor);
     
@@ -227,260 +196,357 @@ function listenToRoom() {
   });
 }
 
-// Sync move to Firebase
-function syncMove() {
+// Leave game
+leaveBtn.addEventListener('click', async () => {
+  if (roomRef) {
+    roomRef.off();
+    if (playerColor === 'w') {
+      await roomRef.remove();
+    } else {
+      await roomRef.update({ blackPlayer: false });
+    }
+  }
+  roomRef = null;
+  roomCode = null;
+  playerColor = null;
+  showMenu();
+});
+
+// Reset button
+resetBtn.addEventListener('click', async () => {
   if (gameMode === 'online' && roomRef) {
-    roomRef.update({
-      board: board,
-      turn: turn,
-      lastMove: lastMove,
-      gameOver: gameOver
+    const initialBoard = [
+      ['bR','bN','bB','bQ','bK','bB','bN','bR'],
+      ['bP','bP','bP','bP','bP','bP','bP','bP'],
+      [null,null,null,null,null,null,null,null],
+      [null,null,null,null,null,null,null,null],
+      [null,null,null,null,null,null,null,null],
+      [null,null,null,null,null,null,null,null],
+      ['wP','wP','wP','wP','wP','wP','wP','wP'],
+      ['wR','wN','wB','wQ','wK','wB','wN','wR']
+    ];
+    
+    await roomRef.update({
+      board: initialBoard,
+      turn: 'w',
+      lastMove: null,
+      gameOver: false
     });
+  } else {
+    initGame();
   }
-}
+});
 
-// Generate random room code
-function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
+// Render board
 function render() {
   boardEl.innerHTML = '';
-  const checkSquare = findKing(turn, board);
-  const inCheck = checkSquare && isAttacked(checkSquare[0], checkSquare[1], opponent(turn), board);
-
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const sq = document.createElement('div');
-      sq.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
-      sq.dataset.row = r;
-      sq.dataset.col = c;
-
-      if (selected && selected[0] === r && selected[1] === c) sq.classList.add('selected');
-      if (lastMove && ((lastMove[0] === r && lastMove[1] === c) || (lastMove[2] === r && lastMove[3] === c))) sq.classList.add('last-move');
-      if (inCheck && checkSquare[0] === r && checkSquare[1] === c) sq.classList.add('in-check');
-
-      const move = legalMoves.find(m => m[0] === r && m[1] === c);
-      if (move) sq.classList.add(board[r][c] ? 'legal-capture' : 'legal-move');
-
-      const piece = board[r][c];
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const square = document.createElement('div');
+      square.className = 'square ' + ((row + col) % 2 === 0 ? 'light' : 'dark');
+      square.dataset.row = row;
+      square.dataset.col = col;
+      
+      const piece = board[row][col];
       if (piece) {
-        const span = document.createElement('span');
-        span.className = 'piece ' + (piece[0] === 'w' ? 'white' : 'black');
-        span.textContent = PIECES[piece[1]];
-        sq.appendChild(span);
+        const pieceEl = document.createElement('div');
+        pieceEl.className = 'piece';
+        pieceEl.textContent = PIECES[piece[1]];
+        pieceEl.style.color = piece[0] === 'w' ? '#fff' : '#000';
+        square.appendChild(pieceEl);
       }
-
-      sq.addEventListener('click', () => onSquareClick(r, c));
-      boardEl.appendChild(sq);
+      
+      if (selected && selected[0] === row && selected[1] === col) {
+        square.classList.add('selected');
+      }
+      
+      if (legalMoves.some(([r, c]) => r === row && c === col)) {
+        square.classList.add('legal-move');
+        if (piece) square.classList.add('capture');
+      }
+      
+      if (lastMove && ((lastMove.from[0] === row && lastMove.from[1] === col) || 
+                       (lastMove.to[0] === row && lastMove.to[1] === col))) {
+        square.classList.add('last-move');
+      }
+      
+      square.addEventListener('click', () => handleSquareClick(row, col));
+      boardEl.appendChild(square);
     }
   }
 }
 
-function onSquareClick(r, c) {
+// Handle square click
+async function handleSquareClick(row, col) {
   if (gameOver) return;
   
-  // In online mode, only allow moves on your turn
   if (gameMode === 'online' && !isMyTurn) {
     return;
   }
-
-  const piece = board[r][c];
-
+  
+  const piece = board[row][col];
+  
   if (selected) {
-    const move = legalMoves.find(m => m[0] === r && m[1] === c);
-    if (move) {
-      makeMove(selected[0], selected[1], r, c);
+    const [selRow, selCol] = selected;
+    const isLegal = legalMoves.some(([r, c]) => r === row && c === col);
+    
+    if (isLegal) {
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][col] = newBoard[selRow][selCol];
+      newBoard[selRow][selCol] = null;
+      
+      const newTurn = turn === 'w' ? 'b' : 'w';
+      const newLastMove = { from: [selRow, selCol], to: [row, col] };
+      
+      if (gameMode === 'online') {
+        await roomRef.update({
+          board: newBoard,
+          turn: newTurn,
+          lastMove: newLastMove
+        });
+      } else {
+        board = newBoard;
+        turn = newTurn;
+        lastMove = newLastMove;
+        selected = null;
+        legalMoves = [];
+        render();
+        updateStatus();
+      }
+    } else {
       selected = null;
       legalMoves = [];
       render();
-      updateStatus();
-      syncMove();
-      return;
     }
-    selected = null;
-    legalMoves = [];
-  }
-
-  if (piece && piece[0] === turn) {
-    // In online mode, only allow selecting your own pieces
+  } else if (piece && piece[0] === turn) {
     if (gameMode === 'online' && piece[0] !== playerColor) {
       return;
     }
-    selected = [r, c];
-    legalMoves = getLegalMoves(r, c, board);
+    selected = [row, col];
+    legalMoves = getLegalMoves(row, col);
+    render();
   }
-  render();
 }
 
-function makeMove(r1, c1, r2, c2) {
-  const piece = board[r1][c1];
-  board[r2][c2] = piece;
-  board[r1][c1] = null;
-  // Pawn promotion (auto-queen)
-  if (piece[1] === 'P' && (r2 === 0 || r2 === 7)) {
-    board[r2][c2] = piece[0] + 'Q';
-  }
-  lastMove = [r1, c1, r2, c2];
-  turn = opponent(turn);
-}
-
-function updateStatus() {
-  const king = findKing(turn, board);
-  const inCheck = king && isAttacked(king[0], king[1], opponent(turn), board);
-  const hasMoves = playerHasMoves(turn);
-
-  let statusText = '';
-
-  if (!hasMoves) {
-    gameOver = true;
-    if (inCheck) {
-      statusText = `Checkmate! ${turn === 'w' ? 'Black' : 'White'} wins! 🏆`;
-    } else {
-      statusText = "Stalemate! It's a draw.";
-    }
-  } else if (inCheck) {
-    statusText = `${turn === 'w' ? 'White' : 'Black'} to move — Check!`;
-  } else {
-    statusText = `${turn === 'w' ? 'White' : 'Black'} to move`;
-  }
-
-  // Add online mode indicator
-  if (gameMode === 'online') {
-    if (gameOver) {
-      // Keep game over message
-    } else if (isMyTurn) {
-      statusText = '🟢 Your turn - ' + statusText;
-    } else {
-      statusText = '⏳ Waiting for opponent...';
-    }
-  }
-
-  statusEl.textContent = statusText;
-}
-
-function opponent(color) {
-  return color === 'w' ? 'b' : 'w';
-}
-
-function inBounds(r, c) {
-  return r >= 0 && r < 8 && c >= 0 && c < 8;
-}
-
-function findKing(color, b) {
-  for (let r = 0; r < 8; r++)
-    for (let c = 0; c < 8; c++)
-      if (b[r][c] === color + 'K') return [r, c];
-  return null;
-}
-
-// Pseudo-legal moves (ignores own-king safety)
-function getPseudoMoves(r, c, b) {
-  const piece = b[r][c];
+// Get legal moves for a piece
+function getLegalMoves(row, col) {
+  const piece = board[row][col];
   if (!piece) return [];
+  
   const color = piece[0];
   const type = piece[1];
   const moves = [];
-
-  const add = (rr, cc) => {
-    if (!inBounds(rr, cc)) return false;
-    if (!b[rr][cc]) { moves.push([rr, cc]); return true; }
-    if (b[rr][cc][0] !== color) moves.push([rr, cc]);
+  
+  const addMove = (r, c) => {
+    if (r < 0 || r > 7 || c < 0 || c > 7) return false;
+    const target = board[r][c];
+    if (!target) {
+      moves.push([r, c]);
+      return true;
+    }
+    if (target[0] !== color) {
+      moves.push([r, c]);
+    }
     return false;
   };
-
-  const slide = (dirs) => {
-    for (const [dr, dc] of dirs) {
-      let rr = r + dr, cc = c + dc;
-      while (inBounds(rr, cc)) {
-        if (!add(rr, cc)) break;
-        rr += dr; cc += dc;
+  
+  const addSlidingMoves = (directions) => {
+    for (const [dr, dc] of directions) {
+      let r = row + dr;
+      let c = col + dc;
+      while (addMove(r, c)) {
+        r += dr;
+        c += dc;
       }
     }
   };
-
-  if (type === 'P') {
-    const dir = color === 'w' ? -1 : 1;
-    const startRow = color === 'w' ? 6 : 1;
-    if (inBounds(r + dir, c) && !b[r + dir][c]) {
-      moves.push([r + dir, c]);
-      if (r === startRow && !b[r + 2 * dir][c]) moves.push([r + 2 * dir, c]);
-    }
-    for (const dc of [-1, 1]) {
-      const rr = r + dir, cc = c + dc;
-      if (inBounds(rr, cc) && b[rr][cc] && b[rr][cc][0] !== color) moves.push([rr, cc]);
-    }
-  } else if (type === 'N') {
-    for (const [dr, dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) add(r + dr, c + dc);
-  } else if (type === 'B') {
-    slide([[-1,-1],[-1,1],[1,-1],[1,1]]);
-  } else if (type === 'R') {
-    slide([[-1,0],[1,0],[0,-1],[0,1]]);
-  } else if (type === 'Q') {
-    slide([[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]]);
-  } else if (type === 'K') {
-    for (const [dr, dc] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]) add(r + dr, c + dc);
+  
+  switch (type) {
+    case 'P':
+      const dir = color === 'w' ? -1 : 1;
+      const startRow = color === 'w' ? 6 : 1;
+      
+      if (!board[row + dir][col]) {
+        moves.push([row + dir, col]);
+        if (row === startRow && !board[row + 2 * dir][col]) {
+          moves.push([row + 2 * dir, col]);
+        }
+      }
+      
+      for (const dc of [-1, 1]) {
+        const target = board[row + dir]?.[col + dc];
+        if (target && target[0] !== color) {
+          moves.push([row + dir, col + dc]);
+        }
+      }
+      break;
+      
+    case 'R':
+      addSlidingMoves([[0,1],[0,-1],[1,0],[-1,0]]);
+      break;
+      
+    case 'N':
+      for (const [dr, dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) {
+        addMove(row + dr, col + dc);
+      }
+      break;
+      
+    case 'B':
+      addSlidingMoves([[1,1],[1,-1],[-1,1],[-1,-1]]);
+      break;
+      
+    case 'Q':
+      addSlidingMoves([[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]);
+      break;
+      
+    case 'K':
+      for (const dr of [-1,0,1]) {
+        for (const dc of [-1,0,1]) {
+          if (dr !== 0 || dc !== 0) {
+            addMove(row + dr, col + dc);
+          }
+        }
+      }
+      break;
   }
+  
+  return moves.filter(([r, c]) => {
+    const testBoard = board.map(row => [...row]);
+    testBoard[r][c] = testBoard[row][col];
+    testBoard[row][col] = null;
+    return !isInCheck(testBoard, color);
+  });
+}
 
+// Check if king is in check
+function isInCheck(testBoard, color) {
+  let kingPos = null;
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      if (testBoard[r][c] === color + 'K') {
+        kingPos = [r, c];
+        break;
+      }
+    }
+    if (kingPos) break;
+  }
+  
+  if (!kingPos) return false;
+  
+  const enemyColor = color === 'w' ? 'b' : 'w';
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = testBoard[r][c];
+      if (piece && piece[0] === enemyColor) {
+        const moves = getPseudoLegalMoves(testBoard, r, c);
+        if (moves.some(([mr, mc]) => mr === kingPos[0] && mc === kingPos[1])) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Get pseudo-legal moves (without check validation)
+function getPseudoLegalMoves(testBoard, row, col) {
+  const piece = testBoard[row][col];
+  if (!piece) return [];
+  
+  const color = piece[0];
+  const type = piece[1];
+  const moves = [];
+  
+  const addMove = (r, c) => {
+    if (r < 0 || r > 7 || c < 0 || c > 7) return false;
+    const target = testBoard[r][c];
+    if (!target) {
+      moves.push([r, c]);
+      return true;
+    }
+    if (target[0] !== color) {
+      moves.push([r, c]);
+    }
+    return false;
+  };
+  
+  const addSlidingMoves = (directions) => {
+    for (const [dr, dc] of directions) {
+      let r = row + dr;
+      let c = col + dc;
+      while (addMove(r, c)) {
+        r += dr;
+        c += dc;
+      }
+    }
+  };
+  
+  switch (type) {
+    case 'P':
+      const dir = color === 'w' ? -1 : 1;
+      for (const dc of [-1, 1]) {
+        const r = row + dir;
+        const c = col + dc;
+        if (r >= 0 && r <= 7 && c >= 0 && c <= 7) {
+          moves.push([r, c]);
+        }
+      }
+      break;
+      
+    case 'R':
+      addSlidingMoves([[0,1],[0,-1],[1,0],[-1,0]]);
+      break;
+      
+    case 'N':
+      for (const [dr, dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) {
+        addMove(row + dr, col + dc);
+      }
+      break;
+      
+    case 'B':
+      addSlidingMoves([[1,1],[1,-1],[-1,1],[-1,-1]]);
+      break;
+      
+    case 'Q':
+      addSlidingMoves([[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]);
+      break;
+      
+    case 'K':
+      for (const dr of [-1,0,1]) {
+        for (const dc of [-1,0,1]) {
+          if (dr !== 0 || dc !== 0) {
+            addMove(row + dr, col + dc);
+          }
+        }
+      }
+      break;
+  }
+  
   return moves;
 }
 
-// Check if a square is attacked by a color
-function isAttacked(r, c, byColor, b) {
-  for (let rr = 0; rr < 8; rr++) {
-    for (let cc = 0; cc < 8; cc++) {
-      const piece = b[rr][cc];
-      if (piece && piece[0] === byColor) {
-        const moves = getPseudoMoves(rr, cc, b);
-        if (moves.some(m => m[0] === r && m[1] === c)) return true;
-      }
-    }
+// Update status
+function updateStatus() {
+  if (gameOver) {
+    const winner = turn === 'w' ? 'Black' : 'White';
+    statusEl.textContent = `Checkmate! ${winner} wins!`;
+    return;
   }
-  return false;
+  
+  const inCheck = isInCheck(board, turn);
+  const currentPlayer = turn === 'w' ? 'White' : 'Black';
+  
+  if (gameMode === 'online') {
+    if (isMyTurn) {
+      statusEl.textContent = inCheck ? `Your turn (${currentPlayer}) - CHECK!` : `Your turn (${currentPlayer})`;
+    } else {
+      statusEl.textContent = `Waiting for opponent (${currentPlayer})...`;
+    }
+  } else {
+    statusEl.textContent = inCheck ? `${currentPlayer}'s turn - CHECK!` : `${currentPlayer}'s turn`;
+  }
 }
 
-// Get legal moves (filters out moves that leave king in check)
-function getLegalMoves(r, c, b) {
-  const piece = b[r][c];
-  if (!piece) return [];
-  const color = piece[0];
-  const pseudoMoves = getPseudoMoves(r, c, b);
-  const legalMoves = [];
-
-  for (const [rr, cc] of pseudoMoves) {
-    // Simulate move
-    const newBoard = b.map(row => [...row]);
-    newBoard[rr][cc] = newBoard[r][c];
-    newBoard[r][c] = null;
-
-    // Check if own king is in check after move
-    const king = findKing(color, newBoard);
-    if (king && !isAttacked(king[0], king[1], opponent(color), newBoard)) {
-      legalMoves.push([rr, cc]);
-    }
-  }
-
-  return legalMoves;
-}
-
-// Check if player has any legal moves
-function playerHasMoves(color) {
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const piece = board[r][c];
-      if (piece && piece[0] === color) {
-        const moves = getLegalMoves(r, c, board);
-        if (moves.length > 0) return true;
-      }
-    }
-  }
-  return false;
-}
-
-// Initialize on page load
+// Initialize
 showMenu();
