@@ -25,6 +25,90 @@ h1 {
   letter-spacing: 2px;
 }
 
+/* Menu Styles */
+.menu {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.menu-btn {
+  display: block;
+  width: 100%;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.menu-btn:hover {
+  background: #c73650;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.menu-btn.secondary {
+  background: #4a5568;
+}
+
+.menu-btn.secondary:hover {
+  background: #3d4852;
+}
+
+.join-form {
+  margin-top: 20px;
+}
+
+.join-form input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #4a5568;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #eee;
+  font-size: 1rem;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.join-form input:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+/* Game Info Styles */
+.game-info {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.room-code-display {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+}
+
+.room-code-display span {
+  color: #e94560;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.player-info {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+
 .status-bar {
   display: flex;
   align-items: center;
@@ -127,6 +211,10 @@ h1 {
   text-shadow: 0 0 2px #666;
 }
 
+.hidden {
+  display: none !important;
+}
+
 @media (max-width: 640px) {
   .board {
     grid-template-columns: repeat(8, 11vw);
@@ -134,5 +222,12 @@ h1 {
   }
   .square {
     font-size: 7vw;
+  }
+  .menu {
+    padding: 24px;
+  }
+  .menu-btn {
+    font-size: 1rem;
+    padding: 12px 20px;
   }
 }
