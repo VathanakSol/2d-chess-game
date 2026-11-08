@@ -3,21 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2D Chess Game</title>
+  <title>2D Chess Game - Online Multiplayer</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
-    <h1>♞ 2D Chess</h1>
+    <h1>♞ 2D Chess - Online</h1>
 
-    <div class="status-bar">
-      <div id="status">White to move</div>
-      <button id="reset-btn">New Game</button>
+    <div id="menu" class="menu">
+      <button id="local-btn" class="menu-btn">Play Local</button>
+      <button id="create-btn" class="menu-btn">Create Online Game</button>
+      <button id="join-btn" class="menu-btn">Join Online Game</button>
     </div>
 
-    <div id="board" class="board"></div>
+    <div id="join-form" class="join-form hidden">
+      <input type="text" id="room-code" placeholder="Enter room code" maxlength="6">
+      <button id="join-submit">Join</button>
+      <button id="join-cancel">Cancel</button>
+    </div>
+
+    <div id="game-info" class="game-info hidden">
+      <div id="room-display"></div>
+      <div id="player-color"></div>
+    </div>
+
+    <div class="status-bar">
+      <div id="status">Select game mode</div>
+      <button id="reset-btn" class="hidden">New Game</button>
+      <button id="leave-btn" class="hidden">Leave Game</button>
+    </div>
+
+    <div id="board" class="board hidden"></div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
